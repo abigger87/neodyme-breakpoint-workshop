@@ -28,3 +28,12 @@ Initial thoughts:
 - possible to re-use a transaction?
 
 Execute solution: `cargo build-bpf --workspace && RUST_BACKTRACE=1 cargo run --bin level1`
+
+#### Level 2
+
+Initial thoughts:
+- re-initialize the account to hijack the authority (doesn't work afaik)
+
+Had to reference the solution for underflow and overflow.
+
+Execute solution: `cargo build-bpf --workspace && RUST_BACKTRACE=1 cargo run --bin level2`
