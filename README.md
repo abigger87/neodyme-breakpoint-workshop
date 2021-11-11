@@ -34,6 +34,21 @@ Execute solution: `cargo build-bpf --workspace && RUST_BACKTRACE=1 cargo run --b
 Initial thoughts:
 - re-initialize the account to hijack the authority (doesn't work afaik)
 
-Had to reference the solution for underflow and overflow.
-
 Execute solution: `cargo build-bpf --workspace && RUST_BACKTRACE=1 cargo run --bin level2`
+
+#### Level 3
+
+Initial thoughts:
+- Send an overflow by depositing a tip into another pool
+  - Doesn't work since there are checks on pool and vault owner's being the program id
+- 
+
+Execute solution: `cargo build-bpf --workspace && RUST_BACKTRACE=1 cargo run --bin level3`
+
+
+#### Level 4
+
+Initial thoughts:
+
+
+Execute solution: `cargo build-bpf --workspace && RUST_BACKTRACE=1 cargo run --bin level4`

