@@ -7,6 +7,9 @@ All details are in the docs. To check it out online, visit [https://workshop.neo
 To build it yourself, install mdbook (`cargo install mdbook`) and run `mdbook serve`.
 
 
+View Docs Online: [Workshop Docs](https://workshop.neodyme.io/index.html)
+
+
 ### Local Development
 
 Compile All Contracts: `cargo build-bpf --workspace`
